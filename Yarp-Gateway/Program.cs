@@ -1,26 +1,21 @@
-using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using Dotnet.Helper.Encryptions;
-using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption;
-using Microsoft.VisualBasic;
-using Polly;
 using Yarp.ReverseProxy.Transforms;
+using dotnet.helper.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+var Services = builder.Services;
+var Configuration = builder.Configuration;
 
-builder.Services.AddCors(options =>
-      options.AddPolicy("AllowOrigins", builder => 
-      builder.WithOrigins("http://localhost:4200")
-      .AllowAnyMethod()
-      .AllowCredentials()
-      .AllowAnyHeader()));
+Configuration.AddEnvironmentVariables("Yarp_");
 
-builder.Services.AddReverseProxy()
+Services.CustomCorsOrigin("CrosPolicy",Configuration);
+
+Services.AddPrometheusMonitoring();
+Services.AddRedinessAndLivenessCheck();
+
+Services.AddReverseProxy()
   .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .AddTransforms(context =>
 {
@@ -36,25 +31,19 @@ builder.Services.AddReverseProxy()
             requestContext.ProxyRequest.Content.Headers.ContentLength = bytes.Length;
         }
     });
-}); ;
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseCustomCors("CrosPolicy");
 
-// app.UseHttpsRedirection();
+app.UsePrometheusMontoring();
 
-//app.UseRouting();
+app.UseHealthCheck();
 
-app.UseCors("AllowOrigins");
+app.UseRouting();
 
 app.MapReverseProxy();
-//app.MapControllers();
 
 app.Run();
 
