@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: yarp-gateway-deployment
+  namespace: dotnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yarp-gateway
+  template:
+    metadata:
+      labels:
+        app: yarp-gateway
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: yarp-gateway-container
+          image: localhost:32000/yarp-gateway:1.0
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "QA"
+            - name: ASPNETCORE_URLS
+              value: "http://*:8080,https://*:8081"
+            - name: ASPNETCORE_Kestrel__Certificates__Default__Path
+              value: "/https/tls.crt"
+            - name: ASPNETCORE_Kestrel__Certificates__Default__KeyPath
+              value: "/https/tls.key"
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8081
+              name: https
+          resources:
+            requests:
+              cpu: 100m
+              memory: 250Mi
+            limits:
+              cpu: 500m
+              memory: 1Giss
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 60
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 60
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: yarp-gateway-service
+  namespace: dotnet
+spec:
+  selector:
+    app: yarp-gateway
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+    - port: 443
+      targetPort: 8081
+      protocol: TCP
+      name: https
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: yarp-gateway-hpa
+  namespace: dotnet
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: yarp-gateway-deployment
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 50

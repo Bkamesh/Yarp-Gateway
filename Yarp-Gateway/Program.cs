@@ -1,7 +1,8 @@
 using System.Text;
 using Dotnet.Helper.Encryptions;
 using Yarp.ReverseProxy.Transforms;
-using dotnet.helper.Extensions;
+using dotnet.helper.BuilderExtensions;
+using dotnet.helper.ApplicationExtensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,10 +14,11 @@ Configuration.AddEnvironmentVariables("Yarp_");
 Services.CustomCorsOrigin("CrosPolicy",Configuration);
 
 Services.AddPrometheusMonitoring();
+
 Services.AddRedinessAndLivenessCheck();
 
 Services.AddReverseProxy()
-  .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+  .LoadFromConfig(Configuration.GetSection("ReverseProxy"))
     .AddTransforms(context =>
 {
     context.AddRequestTransform(async requestContext =>
